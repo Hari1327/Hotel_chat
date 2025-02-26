@@ -1,32 +1,38 @@
 import streamlit as st
-import requests
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
 
-# Load API key securely from Streamlit secrets
+# Load the DeepSeek model and tokenizer
 try:
-    HF_API_KEY = st.secrets["HF_API_KEY"]
-except KeyError:
-    st.error("API key not found. Please add it to secrets.toml")
+    model_name = "deepseek-ai/DeepSeek-R1"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
+    print("DeepSeek model and tokenizer loaded successfully! ✅")
+except Exception as e:
+    st.error(f"Error loading the DeepSeek model: {e}")
     st.stop()
 
-# Hugging Face API URL for the model
-HF_API_URL = "https://api-inference.huggingface.co/models/anezatra/llama-3.1-70b-versatile"
-headers = {"Authorization": f"Bearer {HF_API_KEY}"}
-
 def chatbot_response(user_input):
-    """Sends user input to the Hugging Face API and returns the chatbot's response."""
-    payload = {"inputs": user_input}  # Correct payload structure
+    """Generates a response using the DeepSeek model."""
     try:
-        response = requests.post(HF_API_URL, headers=headers, json=payload)
-        response.raise_for_status()  # Raise an error for bad status codes
-        result = response.json()
-        
-        # Extract the generated text from the response
-        if isinstance(result, list) and len(result) > 0 and "generated_text" in result[0]:
-            return result[0]["generated_text"]
-        else:
-            return "Error: Unexpected response format."
-    except requests.exceptions.RequestException as e:
-        return f"Error: API request failed. Details: {e}"
+        # Tokenize the input
+        inputs = tokenizer(user_input, return_tensors="pt")
+
+        # Generate a response
+        outputs = model.generate(
+            **inputs,
+            max_length=100,  # Adjust max_length as needed
+            num_return_sequences=1,  # Generate one response
+            no_repeat_ngram_size=2,  # Avoid repeating phrases
+            top_p=0.9,  # Nucleus sampling
+            temperature=0.7,  # Control randomness
+        )
+
+        # Decode the generated text
+        response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        return response
+    except Exception as e:
+        return f"Error generating response: {e}"
 
 # Streamlit App
 st.title("\U0001F3E8 Hotel Chatbot")
