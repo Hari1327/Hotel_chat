@@ -1,11 +1,14 @@
 import streamlit as st
 import requests
-import os
 
-# Load API key securely
-HF_API_KEY = os.getenv("HF_API_KEY")
+# Load API key securely from Streamlit secrets
+try:
+    HF_API_KEY = st.secrets["HF_API_KEY"]
+except KeyError:
+    st.error("API key not found. Please add it to secrets.toml")
+    st.stop()
+
 HF_API_URL = "https://api-inference.huggingface.co/models/meta-llama/Llama-2-7b-chat-hf"
-
 headers = {"Authorization": f"Bearer {HF_API_KEY}"}
 
 def chatbot_response(user_input):
