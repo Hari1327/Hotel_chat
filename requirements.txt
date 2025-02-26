@@ -4,5 +4,5 @@ langchain
 langchain-community
 torch
 accelerate
-chromadb == 0.3.29
+chromadb==0.3.26
 pysqlite3-binary
