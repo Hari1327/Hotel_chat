@@ -1,99 +1,50 @@
 import streamlit as st
-import requests
+import pandas as pd
+import chromadb
+from langchain.chains import ConversationalRetrievalChain
+from langchain.chat_models import ChatOpenAI
+from langchain.vectorstores import Chroma
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.memory import ConversationBufferMemory
 
-# Load API key securely from Streamlit secrets
-try:
-    HF_API_KEY = st.secrets["HF_API_KEY"]
-except KeyError:
-    st.error("API key not found. Please add it to secrets.toml")
-    st.stop()
+# Load CSV Data
+def load_data(file_path):
+    df = pd.read_csv(file_path)
+    return df[['utterance', 'intent', 'category', 'tags']]
 
-# Hugging Face API URL for GPT-2
-HF_API_URL = "https://api-inference.huggingface.co/models/gpt2"
-headers = {"Authorization": f"Bearer {HF_API_KEY}"}
+# Initialize ChromaDB
+chroma_client = chromadb.PersistentClient(path="chroma_db")
+collection = chroma_client.get_or_create_collection(name="customer_support")
 
-def chatbot_response(user_input):
-    """Sends user input to the Hugging Face API and returns the chatbot's response."""
-    payload = {"inputs": user_input}
-    try:
-        response = requests.post(HF_API_URL, headers=headers, json=payload)
-        response.raise_for_status()  # Raise an error for bad status codes
-        result = response.json()
-        
-        # Extract the generated text from the response
-        if isinstance(result, list) and len(result) > 0 and "generated_text" in result[0]:
-            return result[0]["generated_text"]
-        else:
-            return "Error: Unexpected response format."
-    except requests.exceptions.RequestException as e:
-        return f"Error: API request failed. Details: {e}"
+# Load data into ChromaDB
+def populate_chroma(df):
+    for idx, row in df.iterrows():
+        collection.add(ids=[str(idx)], documents=[row['utterance']], metadatas=[{"intent": row['intent'], "category": row['category'], "tags": row['tags']}])
 
-# Streamlit App
-st.title("\U0001F3E8 Hotel Chatbot")
+data = load_data("/content/drive/MyDrive/Guvi_final_Project/CS Data/Bitext_Sample_Customer_Service_Training_Dataset.csv")
+populate_chroma(data)
 
-# Sidebar options
-menu = st.sidebar.radio(
-    "Select an option",
-    ["Chat", "Make a Booking", "Cancel a Booking", "Payment Methods", "Hotel Info", "Room Service", "WiFi Details", "Local Recommendations", "Customer Support"]
-)
+# Setup LLM (Groq API via OpenAI wrapper)
+llm = ChatOpenAI(model_name="gpt-4", openai_api_key="GROQ_API_KEY")
+retriever = Chroma(persist_directory="chroma_db", embedding_function=OpenAIEmbeddings()).as_retriever()
 
-if menu == "Chat":
-    st.subheader("Chat with the Hotel Bot")
-    user_input = st.text_input("Ask me anything about the hotel:")
-    if user_input:
-        with st.spinner("Generating response..."):
-            response = chatbot_response(user_input)
-        st.write(response)
+# LangChain Chatbot Chain
+memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+qa_chain = ConversationalRetrievalChain.from_llm(llm, retriever=retriever, memory=memory)
 
-elif menu == "Make a Booking":
-    st.subheader("Book a Service")
-    service = st.selectbox("Choose a service", ["Room", "Dining", "Spa", "Conference Room"])
-    date = st.date_input("Select a date")
-    if st.button("Confirm Booking"):
-        st.success(f"{service} booked for {date}")
+# Streamlit UI
+st.title("Customer Support Chatbot")
+st.write("Ask me anything about our services!")
 
-elif menu == "Cancel a Booking":
-    st.subheader("Cancel a Booking")
-    booking_id = st.text_input("Enter your booking ID")
-    if st.button("Cancel Booking"):
-        st.error(f"Booking {booking_id} has been canceled.")
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-elif menu == "Payment Methods":
-    st.subheader("Available Payment Methods")
-    st.write("✅ Credit/Debit Card")
-    st.write("✅ PayPal")
-    st.write("✅ Google Pay / Apple Pay")
-    st.write("✅ Cash at Reception")
+user_input = st.text_input("You:", "")
+if user_input:
+    response = qa_chain.run(user_input)
+    st.session_state.chat_history.append((user_input, response))
 
-elif menu == "Hotel Info":
-    st.subheader("Hotel Information")
-    st.write("\U0001F3E8 Check-in: 2:00 PM")
-    st.write("\U0001F3E8 Check-out: 11:00 AM")
-    st.write("\U0001F3E8 Free WiFi available")
-    st.write("\U0001F3E8 Swimming pool, gym, spa")
-
-elif menu == "Room Service":
-    st.subheader("Order Room Service")
-    food_item = st.text_input("Enter food or service request")
-    if st.button("Order Now"):
-        st.success(f"Room service request received: {food_item}")
-
-elif menu == "WiFi Details":
-    st.subheader("WiFi Information")
-    st.write("\U0001F4F6 Network: Hotel_WiFi")
-    st.write("\U0001F511 Password: Stay@Hotel123")
-
-elif menu == "Local Recommendations":
-    st.subheader("Nearby Attractions")
-    st.write("\U0001F306 Famous Restaurant: City Dine")
-    st.write("\U0001F3DB️ Tourist Spot: Grand Museum")
-    st.write("\U0001F6CD️ Shopping Mall: Central Plaza")
-
-elif menu == "Customer Support":
-    st.subheader("Customer Support")
-    issue = st.text_area("Describe your issue")
-    if st.button("Submit Issue"):
-        st.warning("Your issue has been reported. Our team will contact you soon.")
-
-# Footer
-st.sidebar.info("For assistance, call +123456789 or email support@hotel.com")
+    # Display chat history
+    for user, bot in st.session_state.chat_history:
+        st.write(f"**You:** {user}")
+        st.write(f"**Bot:** {bot}")
