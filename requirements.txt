@@ -2,3 +2,4 @@ transformers
 requests 
 langchain
 langchain-community
+torch
