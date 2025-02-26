@@ -5,4 +5,4 @@ langchain-community
 torch
 accelerate
 chromadb
-pysqlite3-binary
+db-sqlite3== 3.35.0
