@@ -14,7 +14,7 @@ load_dotenv()
 # Initialize components
 def initialize_components():
     # Load CSV data
-    df = pd.read_csv('data.csv')  # Update with your CSV path
+    df = pd.read_csv('Bitext_Sample_Customer_Service_Training_Dataset.csv')  # Update with your CSV path
     
     # Initialize embeddings
     embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
