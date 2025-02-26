@@ -8,8 +8,8 @@ except KeyError:
     st.error("API key not found. Please add it to secrets.toml")
     st.stop()
 
-# Hugging Face API URL for the Llama model
-HF_API_URL = "https://api-inference.huggingface.co/models/meta-llama/Llama-2-7b-chat-hf"
+# Hugging Face API URL for GPT-2
+HF_API_URL = "https://api-inference.huggingface.co/models/gpt2"
 headers = {"Authorization": f"Bearer {HF_API_KEY}"}
 
 def chatbot_response(user_input):
