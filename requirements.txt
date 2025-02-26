@@ -5,4 +5,4 @@ langchain-community
 torch
 accelerate
 chromadb
-db-sqlite3== 3.35.0
+db-sqlite3 == 3.35.0
