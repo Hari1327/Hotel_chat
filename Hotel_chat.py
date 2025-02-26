@@ -1,38 +1,32 @@
 import streamlit as st
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
+import requests
 
-# Load the DeepSeek model and tokenizer
+# Load API key securely from Streamlit secrets
 try:
-    model_name = "deepseek-ai/DeepSeek-R1"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
-    print("DeepSeek model and tokenizer loaded successfully! ✅")
-except Exception as e:
-    st.error(f"Error loading the DeepSeek model: {e}")
+    HF_API_KEY = st.secrets["HF_API_KEY"]
+except KeyError:
+    st.error("API key not found. Please add it to secrets.toml")
     st.stop()
 
+# Hugging Face API URL for the Llama model
+HF_API_URL = "https://api-inference.huggingface.co/models/meta-llama/Llama-2-7b-chat-hf"
+headers = {"Authorization": f"Bearer {HF_API_KEY}"}
+
 def chatbot_response(user_input):
-    """Generates a response using the DeepSeek model."""
+    """Sends user input to the Hugging Face API and returns the chatbot's response."""
+    payload = {"inputs": user_input}
     try:
-        # Tokenize the input
-        inputs = tokenizer(user_input, return_tensors="pt")
-
-        # Generate a response
-        outputs = model.generate(
-            **inputs,
-            max_length=100,  # Adjust max_length as needed
-            num_return_sequences=1,  # Generate one response
-            no_repeat_ngram_size=2,  # Avoid repeating phrases
-            top_p=0.9,  # Nucleus sampling
-            temperature=0.7,  # Control randomness
-        )
-
-        # Decode the generated text
-        response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        return response
-    except Exception as e:
-        return f"Error generating response: {e}"
+        response = requests.post(HF_API_URL, headers=headers, json=payload)
+        response.raise_for_status()  # Raise an error for bad status codes
+        result = response.json()
+        
+        # Extract the generated text from the response
+        if isinstance(result, list) and len(result) > 0 and "generated_text" in result[0]:
+            return result[0]["generated_text"]
+        else:
+            return "Error: Unexpected response format."
+    except requests.exceptions.RequestException as e:
+        return f"Error: API request failed. Details: {e}"
 
 # Streamlit App
 st.title("\U0001F3E8 Hotel Chatbot")
