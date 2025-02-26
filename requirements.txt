@@ -5,3 +5,4 @@ langchain-community
 torch
 accelerate
 chromadb
+pysqlite3
