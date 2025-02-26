@@ -1,3 +1,4 @@
 transformers
 requests 
 langchain
+langchain-community
