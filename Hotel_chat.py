@@ -8,33 +8,41 @@ except KeyError:
     st.error("API key not found. Please add it to secrets.toml")
     st.stop()
 
+# Hugging Face API URL for the model
 HF_API_URL = "https://api-inference.huggingface.co/models/anezatra/llama-3.1-70b-versatile"
 headers = {"Authorization": f"Bearer {HF_API_KEY}"}
 
 def chatbot_response(user_input):
-    payload = {"inputs": {"text": user_input}}
-    response = requests.post(HF_API_URL, headers=headers, json=payload)
-    
-    if response.status_code == 200:
-        try:
-            result = response.json()
-            if isinstance(result, list) and len(result) > 0 and "generated_text" in result[0]:
-                return result[0]["generated_text"]
-            else:
-                return "Error: Unexpected response format."
-        except (KeyError, IndexError, TypeError):
-            return "Error: Could not parse the response."
-    return f"Error: API request failed with status {response.status_code}. Details: {response.text}"
+    """Sends user input to the Hugging Face API and returns the chatbot's response."""
+    payload = {"inputs": user_input}  # Correct payload structure
+    try:
+        response = requests.post(HF_API_URL, headers=headers, json=payload)
+        response.raise_for_status()  # Raise an error for bad status codes
+        result = response.json()
+        
+        # Extract the generated text from the response
+        if isinstance(result, list) and len(result) > 0 and "generated_text" in result[0]:
+            return result[0]["generated_text"]
+        else:
+            return "Error: Unexpected response format."
+    except requests.exceptions.RequestException as e:
+        return f"Error: API request failed. Details: {e}"
 
+# Streamlit App
 st.title("\U0001F3E8 Hotel Chatbot")
 
 # Sidebar options
-menu = st.sidebar.radio("Select an option", ["Chat", "Make a Booking", "Cancel a Booking", "Payment Methods", "Hotel Info", "Room Service", "WiFi Details", "Local Recommendations", "Customer Support"])
+menu = st.sidebar.radio(
+    "Select an option",
+    ["Chat", "Make a Booking", "Cancel a Booking", "Payment Methods", "Hotel Info", "Room Service", "WiFi Details", "Local Recommendations", "Customer Support"]
+)
 
 if menu == "Chat":
+    st.subheader("Chat with the Hotel Bot")
     user_input = st.text_input("Ask me anything about the hotel:")
     if user_input:
-        response = chatbot_response(user_input)
+        with st.spinner("Generating response..."):
+            response = chatbot_response(user_input)
         st.write(response)
 
 elif menu == "Make a Booking":
@@ -87,4 +95,5 @@ elif menu == "Customer Support":
     if st.button("Submit Issue"):
         st.warning("Your issue has been reported. Our team will contact you soon.")
 
+# Footer
 st.sidebar.info("For assistance, call +123456789 or email support@hotel.com")
