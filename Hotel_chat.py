@@ -1,50 +1,92 @@
+# app.py
+import os
 import streamlit as st
 import pandas as pd
-import chromadb
-from langchain.chains import ConversationalRetrievalChain
-from langchain.chat_models import ChatOpenAI
-from langchain.vectorstores import Chroma
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.memory import ConversationBufferMemory
+from langchain_groq import ChatGroq
+from langchain.prompts import PromptTemplate
+from langchain_community.vectorstores import Chroma
+from langchain_community.embeddings import SentenceTransformerEmbeddings
 
-# Load CSV Data
-def load_data(file_path):
-    df = pd.read_csv(file_path)
-    return df[['utterance', 'intent', 'category', 'tags']]
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
 
-# Initialize ChromaDB
-chroma_client = chromadb.PersistentClient(path="chroma_db")
-collection = chroma_client.get_or_create_collection(name="customer_support")
+# Initialize components
+def initialize_components():
+    # Load CSV data
+    df = pd.read_csv('data.csv')  # Update with your CSV path
+    
+    # Initialize embeddings
+    embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+    
+    # Create ChromaDB vector store
+    vector_store = Chroma.from_texts(
+        texts=df['utterance'].tolist(),
+        embedding=embeddings,
+        metadatas=df[['intent', 'category', 'tags']].to_dict('records')
+    )
+    
+    # Initialize Groq LLM
+    llm = ChatGroq(
+        groq_api_key=os.getenv("GROQ_API_KEY"),
+        model_name="mixtral-8x7b-32768"
+    )
+    
+    return vector_store, llm
 
-# Load data into ChromaDB
-def populate_chroma(df):
-    for idx, row in df.iterrows():
-        collection.add(ids=[str(idx)], documents=[row['utterance']], metadatas=[{"intent": row['intent'], "category": row['category'], "tags": row['tags']}])
+# Create prompt template
+def create_prompt_template():
+    template = """
+    You're a customer support assistant. Use the following context to help the user:
+    
+    Context:
+    {context}
+    
+    User Question: {question}
+    
+    Provide a helpful and professional response:
+    """
+    return PromptTemplate(template=template, input_variables=["context", "question"])
 
-data = load_data("/content/drive/MyDrive/Guvi_final_Project/CS Data/Bitext_Sample_Customer_Service_Training_Dataset.csv")
-populate_chroma(data)
+# Main app
+def main():
+    st.title("Customer Support Chatbot")
+    
+    # Initialize session state
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    
+    # Initialize components
+    vector_store, llm = initialize_components()
+    prompt_template = create_prompt_template()
+    
+    # Display chat messages
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+    
+    # User input
+    if user_input := st.chat_input("How can I help you today?"):
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        
+        # Retrieve relevant context
+        results = vector_store.similarity_search(user_input, k=3)
+        context = "\n".join([
+            f"Utterance: {doc.page_content}\nIntent: {doc.metadata['intent']}\nCategory: {doc.metadata['category']}"
+            for doc in results
+        ])
+        
+        # Generate response
+        chain = prompt_template | llm
+        response = chain.invoke({"context": context, "question": user_input})
+        
+        # Add assistant response to chat history
+        st.session_state.messages.append({"role": "assistant", "content": response.content})
+        
+        # Display assistant response
+        with st.chat_message("assistant"):
+            st.markdown(response.content)
 
-# Setup LLM (Groq API via OpenAI wrapper)
-llm = ChatOpenAI(model_name="gpt-4", openai_api_key="GROQ_API_KEY")
-retriever = Chroma(persist_directory="chroma_db", embedding_function=OpenAIEmbeddings()).as_retriever()
-
-# LangChain Chatbot Chain
-memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-qa_chain = ConversationalRetrievalChain.from_llm(llm, retriever=retriever, memory=memory)
-
-# Streamlit UI
-st.title("Customer Support Chatbot")
-st.write("Ask me anything about our services!")
-
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-user_input = st.text_input("You:", "")
-if user_input:
-    response = qa_chain.run(user_input)
-    st.session_state.chat_history.append((user_input, response))
-
-    # Display chat history
-    for user, bot in st.session_state.chat_history:
-        st.write(f"**You:** {user}")
-        st.write(f"**Bot:** {bot}")
+if __name__ == "__main__":
+    main()
