@@ -1,5 +1,5 @@
 import streamlit as st
-import requests
+from langchain.llms import HuggingFaceHub
 
 # Load API key securely from Streamlit secrets
 try:
@@ -8,23 +8,17 @@ except KeyError:
     st.error("API key not found. Please add it to secrets.toml")
     st.stop()
 
-HF_API_URL = "https://api-inference.huggingface.co/models/meta-llama/Llama-2-7b-chat"
-headers = {"Authorization": f"Bearer {HF_API_KEY}"}
+# Initialize LangChain's HuggingFaceHub
+llm = HuggingFaceHub(
+    repo_id="meta-llama/Llama-2-7b-chat",
+    huggingfacehub_api_token=HF_API_KEY
+)
 
 def chatbot_response(user_input):
-    payload = {"inputs": {"text": user_input}}
-    response = requests.post(HF_API_URL, headers=headers, json=payload)
-    
-    if response.status_code == 200:
-        try:
-            result = response.json()
-            if isinstance(result, list) and len(result) > 0 and "generated_text" in result[0]:
-                return result[0]["generated_text"]
-            else:
-                return "Error: Unexpected response format."
-        except (KeyError, IndexError, TypeError):
-            return "Error: Could not parse the response."
-    return f"Error: API request failed with status {response.status_code}. Details: {response.text}"
+    try:
+        return llm(user_input)
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 st.title("\U0001F3E8 Hotel Chatbot")
 
