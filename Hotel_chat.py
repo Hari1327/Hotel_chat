@@ -14,11 +14,19 @@ headers = {"Authorization": f"Bearer {HF_API_KEY}"}
 def chatbot_response(user_input):
     payload = {"inputs": user_input}
     response = requests.post(HF_API_URL, headers=headers, json=payload)
+    
     if response.status_code == 200:
-        return response.json()[0]['generated_text']
-    return "Error: Unable to fetch response."
+        try:
+            result = response.json()
+            if isinstance(result, dict) and "generated_text" in result:
+                return result["generated_text"]
+            elif isinstance(result, list) and len(result) > 0 and "generated_text" in result[0]:
+                return result[0]["generated_text"]
+        except (KeyError, IndexError, TypeError):
+            return "Error: Unexpected response format."
+    return f"Error: API request failed with status {response.status_code}."
 
-st.title("🏨 Hotel Chatbot")
+st.title("\U0001F3E8 Hotel Chatbot")
 
 # Sidebar options
 menu = st.sidebar.radio("Select an option", ["Chat", "Make a Booking", "Cancel a Booking", "Payment Methods", "Hotel Info", "Room Service", "WiFi Details", "Local Recommendations", "Customer Support"])
@@ -51,10 +59,10 @@ elif menu == "Payment Methods":
 
 elif menu == "Hotel Info":
     st.subheader("Hotel Information")
-    st.write("🏨 Check-in: 2:00 PM")
-    st.write("🏨 Check-out: 11:00 AM")
-    st.write("🏨 Free WiFi available")
-    st.write("🏨 Swimming pool, gym, spa")
+    st.write("\U0001F3E8 Check-in: 2:00 PM")
+    st.write("\U0001F3E8 Check-out: 11:00 AM")
+    st.write("\U0001F3E8 Free WiFi available")
+    st.write("\U0001F3E8 Swimming pool, gym, spa")
 
 elif menu == "Room Service":
     st.subheader("Order Room Service")
@@ -64,14 +72,14 @@ elif menu == "Room Service":
 
 elif menu == "WiFi Details":
     st.subheader("WiFi Information")
-    st.write("📶 Network: Hotel_WiFi")
-    st.write("🔑 Password: Stay@Hotel123")
+    st.write("\U0001F4F6 Network: Hotel_WiFi")
+    st.write("\U0001F511 Password: Stay@Hotel123")
 
 elif menu == "Local Recommendations":
     st.subheader("Nearby Attractions")
-    st.write("🌆 Famous Restaurant: City Dine")
-    st.write("🏛️ Tourist Spot: Grand Museum")
-    st.write("🛍️ Shopping Mall: Central Plaza")
+    st.write("\U0001F306 Famous Restaurant: City Dine")
+    st.write("\U0001F3DB️ Tourist Spot: Grand Museum")
+    st.write("\U0001F6CD️ Shopping Mall: Central Plaza")
 
 elif menu == "Customer Support":
     st.subheader("Customer Support")
