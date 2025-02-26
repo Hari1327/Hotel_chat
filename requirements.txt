@@ -1,8 +1,7 @@
-transformers
-requests 
+streamlit
 langchain
-langchain-community
-torch
-accelerate
-chromadb==0.3.26
-pysqlite3-binary
+langchain-groq
+chromadb
+pandas
+python-dotenv
+sentence-transformers
