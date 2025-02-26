@@ -1,12 +1,19 @@
 import streamlit as st
-from transformers import pipeline
+import requests
+import os
 
-# Load Hugging Face chatbot model
-chatbot = pipeline("conversational", model="facebook/blenderbot-400M-distill")
+# Load API key securely
+HF_API_KEY = os.getenv("HF_API_KEY")
+HF_API_URL = "https://api-inference.huggingface.co/models/meta-llama/Llama-2-7b-chat-hf"
+
+headers = {"Authorization": f"Bearer {HF_API_KEY}"}
 
 def chatbot_response(user_input):
-    response = chatbot(user_input)
-    return response["generated_responses"][0]
+    payload = {"inputs": user_input}
+    response = requests.post(HF_API_URL, headers=headers, json=payload)
+    if response.status_code == 200:
+        return response.json()[0]['generated_text']
+    return "Error: Unable to fetch response."
 
 st.title("🏨 Hotel Chatbot")
 
@@ -23,7 +30,8 @@ elif menu == "Make a Booking":
     st.subheader("Book a Service")
     service = st.selectbox("Choose a service", ["Room", "Dining", "Spa", "Conference Room"])
     date = st.date_input("Select a date")
-    st.button("Confirm Booking", on_click=lambda: st.success(f"{service} booked for {date}"))
+    if st.button("Confirm Booking"):
+        st.success(f"{service} booked for {date}")
 
 elif menu == "Cancel a Booking":
     st.subheader("Cancel a Booking")
